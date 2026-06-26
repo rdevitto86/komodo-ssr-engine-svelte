@@ -1,0 +1,226 @@
+openapi: "3.1.0"
+info:
+  title: komodo-ssr-engine-svelte
+  version: "0.1.0"
+  description: |
+    SvelteKit-based SSR engine. Pre-renders and caches component trees for performance-critical
+    and SEO-sensitive pages, delivering HTML fragments to the ui shell. Private-only — all routes
+    are service-to-service. Uses Bun runtime. Spec-only: no routes implemented yet.
+
+    HTTP conventions: POST → 201 Created / 400 Bad Request / 409 Conflict;
+    PUT → 200 OK / 404 Not Found; DELETE → 204 No Content / 404 Not Found;
+    GET → 200 OK / 404 Not Found.
+
+servers:
+  - url: http://localhost:7003
+    description: Private / internal (local dev)
+
+tags:
+  - name: Health
+  - name: Render
+  - name: Admin
+
+paths:
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      operationId: healthCheck
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Service degraded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /v1/render:
+    post:
+      tags: [Render]
+      summary: Render a SvelteKit component tree to an HTML fragment
+      operationId: renderComponent
+      x-visibility: private
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenderRequest"
+      responses:
+        "200":
+          description: Rendered HTML fragment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/admin/content/invalidate:
+    post:
+      tags: [Admin]
+      summary: Invalidate cached rendered content
+      operationId: invalidateContent
+      x-visibility: private
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvalidateRequest"
+      responses:
+        "200":
+          description: Content invalidated
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/admin/content/upsert:
+    post:
+      tags: [Admin]
+      summary: Upsert content in the SSR cache
+      operationId: upsertContent
+      x-visibility: private
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertContentRequest"
+      responses:
+        "200":
+          description: Content upserted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Content"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        timestamp:
+          type: string
+          format: date-time
+
+    RenderRequest:
+      type: object
+      required: [component, props]
+      properties:
+        component:
+          type: string
+          description: Component identifier (e.g. "ProductDetail", "LandingHero")
+        props:
+          type: object
+          additionalProperties: true
+          description: Props to pass to the component at render time
+        cache_key:
+          type: string
+          description: Optional explicit cache key; derived from component + props if omitted
+        ttl_seconds:
+          type: integer
+          description: Override cache TTL for this render; server default applied if omitted
+
+    RenderResponse:
+      type: object
+      required: [html, cache_hit]
+      properties:
+        html:
+          type: string
+          description: Rendered HTML fragment
+        cache_hit:
+          type: boolean
+          description: True if the response was served from cache
+        rendered_at:
+          type: string
+          format: date-time
+
+    InvalidateRequest:
+      type: object
+      required: [content_ids]
+      properties:
+        content_ids:
+          type: array
+          items:
+            type: string
+          description: Cache keys to invalidate
+
+    UpsertContentRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: object
+          additionalProperties: true
+
+    Content:
+      type: object
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+
+    Problem:
+      type: object
+      description: RFC 7807 Problem+JSON
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request body
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
