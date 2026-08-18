@@ -10,8 +10,12 @@ export async function GET() {
   };
   
   try {
+    const bucket = process.env[S3_CONTENT_BUCKET];
+    if (!bucket) {
+      throw new Error('S3_CONTENT_BUCKET not configured');
+    }
     await new S3Client({ region: process.env[AWS_REGION] })
-      .send(new HeadBucketCommand({ Bucket: process.env[S3_CONTENT_BUCKET]! }));
+      .send(new HeadBucketCommand({ Bucket: bucket }));
   } catch {
     checks.s3 = 'error';
     checks.status = 'degraded';

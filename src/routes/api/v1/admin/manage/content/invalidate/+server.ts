@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import { invalidatePage } from '$lib/server/cloudfront';
 import type { RequestHandler } from '../../$types';
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals: _locals }) => {
   // TODO: Add authentication check
   // if (!locals.user?.isAdmin) {
   //   throw error(403, 'Forbidden');

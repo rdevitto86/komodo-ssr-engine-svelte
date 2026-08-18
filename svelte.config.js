@@ -1,13 +1,10 @@
-import adapter from '@sveltejs/adapter-node';
+import bunAdapter from './src/lib/adapters/bun.ts';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 export default {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter({
-      out: 'build',
-      precompress: true,
-    }),
+    adapter: bunAdapter(),
     paths: {
       base: '',
       assets: '',
